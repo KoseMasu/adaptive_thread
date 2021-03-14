@@ -34,17 +34,18 @@
 
 using namespace std;
 
-void worker(size_t thid, char &ready, const bool &start, const bool &quit) {
+
+void worker(size_t thid, char &ready, const bool &start, const bool &quit,const int cpuid) {
   Result &myres = std::ref(SiloResult[thid]);
   Xoroshiro128Plus rnd;
   rnd.init();
   TxnExecutor trans(thid, (Result *) &myres);
   FastZipf zipf(&rnd, FLAGS_zipf_skew, FLAGS_tuple_num);
   uint64_t epoch_timer_start, epoch_timer_stop;
-#if BACK_OFF
+#if BACK_OFF||BACK_OFF_READ_PHASE
   Backoff backoff(FLAGS_clocks_per_us);
 #endif
-
+  //std::cout << "Thread #" << thid << ": on CPU " << sched_getcpu() << "\n";
 #if WAL
   /*
   const boost::filesystem::path log_dir_path("/tmp/ccbench");
@@ -64,7 +65,7 @@ void worker(size_t thid, char &ready, const bool &start, const bool &quit) {
 #endif
 
 #ifdef Linux
-  setThreadAffinity(thid);
+  setThreadAffinity(cpuid);
   // printf("Thread #%d: on CPU %d\n", res.thid_, sched_getcpu());
   // printf("sysconf(_SC_NPROCESSORS_CONF) %d\n",
   // sysconf(_SC_NPROCESSORS_CONF));
@@ -95,8 +96,8 @@ void worker(size_t thid, char &ready, const bool &start, const bool &quit) {
 RETRY:
     if (thid == 0) {
       leaderWork(epoch_timer_start, epoch_timer_stop);
-#if BACK_OFF
-      leaderBackoffWork(backoff, Result);
+#if BACK_OFF||BACK_OFF_READ_PHASE
+      leaderBackoffWork(backoff, SiloResult);
 #endif
       // printf("Thread #%d: on CPU %d\n", thid, sched_getcpu());
     }
@@ -117,6 +118,7 @@ RETRY:
         ERR;
       }
     }
+    //int flag_backoff = trans.validationPhase();
 
     if (trans.validationPhase()) {
       trans.writePhase();
@@ -126,8 +128,14 @@ RETRY:
        */
       storeRelease(myres.local_commit_counts_,
                    loadAcquire(myres.local_commit_counts_) + 1);
+      /*if(rnd.next()%10 < 2){
+        Backoff::backoff(FLAGS_clocks_per_us,thid);
+      }*/
+#if BACK_OFF
+      backoff.thad_ch_sleep(thid);
+#endif
     } else {
-      trans.abort();
+      trans.abort(thid,rnd);
       ++myres.local_abort_counts_;
       goto RETRY;
     }
@@ -147,9 +155,11 @@ int main(int argc, char *argv[]) try {
   initResult();
   std::vector<char> readys(FLAGS_thread_num);
   std::vector<std::thread> thv;
+  //int cpulist[] ={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,112,113,114,115,116,117,118,119,120,121,122,123,124};
   for (size_t i = 0; i < FLAGS_thread_num; ++i)
     thv.emplace_back(worker, i, std::ref(readys[i]), std::ref(start),
-                     std::ref(quit));
+                     std::ref(quit),i);
+
   waitForReady(readys);
   storeRelease(start, true);
   for (size_t i = 0; i < FLAGS_extime; ++i) {

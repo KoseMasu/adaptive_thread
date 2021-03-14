@@ -63,6 +63,7 @@ void TxnExecutor::read(uint64_t key) {
 #if ADD_ANALYSIS
   uint64_t start = rdtscp();
 #endif
+  //bool flag_sleep = false;//for readphase extension
 
   // these variable cause error (-fpermissive)
   // "crosses initialization of ..."
@@ -96,6 +97,7 @@ void TxnExecutor::read(uint64_t key) {
   for (;;) {
     while (expected.lock) {
       expected.obj_ = loadAcquire(tuple->tidword_.obj_);
+      //flag_sleep = true;
     }
 
     //(b) checks whether the record is the latest version
@@ -121,7 +123,18 @@ void TxnExecutor::read(uint64_t key) {
   // emplace is often better performance than push_back.
 
 #if SLEEP_READ_PHASE
-  sleepTics(SLEEP_READ_PHASE);
+  if(flag_sleep==false)sleepTics(SLEEP_READ_PHASE);
+#endif
+
+#if BACK_OFF_READ_PHASE
+#if ADD_ANALYSIS
+  {uint64_t start2(rdtscp());
+#endif
+  Backoff::backoff(FLAGS_clocks_per_us);
+
+#if ADD_ANALYSIS
+  sres_->local_backoff_latency_ += rdtscp() - start2;}
+#endif
 #endif
 
 FINISH_READ:
@@ -201,7 +214,8 @@ bool TxnExecutor::validationPhase() {
 #endif
       this->status_ = TransactionStatus::kAborted;
       unlockWriteSet();
-      return false;
+      //return 2;
+      return 0;
     }
     // 2
     // if (!check.latest) return false;
@@ -213,7 +227,8 @@ bool TxnExecutor::validationPhase() {
 #endif
       this->status_ = TransactionStatus::kAborted;
       unlockWriteSet();
-      return false;
+      //return 3;
+      return 0;
     }
     max_rset_ = max(max_rset_, check);
   }
@@ -223,24 +238,26 @@ bool TxnExecutor::validationPhase() {
   sres_->local_vali_latency_ += rdtscp() - start;
 #endif
   this->status_ = TransactionStatus::kCommitted;
-  return true;
+  return 1;
 }
 
-void TxnExecutor::abort() {
+void TxnExecutor::abort(size_t id,Xoroshiro128Plus &rnd) {
   read_set_.clear();
   write_set_.clear();
-
+//if(flag==3){
 #if BACK_OFF
 #if ADD_ANALYSIS
-  uint64_t start(rdtscp());
+  //uint64_t start(rdtscp());
 #endif
-
-  Backoff::backoff(FLAGS_clocks_per_us);
+  //if(rnd.next()%10 < 2){
+  //	Backoff::backoff(FLAGS_clocks_per_us,id);//,rnd);
+  //}
 
 #if ADD_ANALYSIS
-  sres_->local_backoff_latency_ += rdtscp() - start;
+  //sres_->local_backoff_latency_ += rdtscp() - start;
 #endif
 #endif
+//}
 }
 
 void TxnExecutor::wal(uint64_t ctid) {

@@ -18,31 +18,121 @@ public:
   static std::atomic<double> Backoff_;
   static constexpr double kMinBackoff = 0;
   static constexpr double kMaxBackoff = 1000;
-  static constexpr double kIncrBackoff = 100;
-  //static constexpr double kIncrBackoff = 0.5;
-
+  //static constexpr double kIncrBackoff = 100;
+  static constexpr double kIncrBackoff = 0.5;
+  //static constexpr double k = 10;
+  bool thad[224]={};
+#if COUNT_THREAD
+  static bool threadSleep[224]; //64byteにする
+  static bool tslook;
+#endif
   uint64_t last_committed_txs_ = 0;
   double last_committed_tput_ = 0;
   uint64_t last_backoff_ = 0;
   uint64_t last_time_ = 0;
   size_t clocks_per_us_;
+#if BACK_OFF_ANALYZE
+  uint64_t last_time_analyze = 0;
+  vector<double> backoff_analyze_result;
+  vector<double> backoff_analyze_result_tput;
+#endif
+#if COUNT_THREAD
+  uint64_t last_time_tc = 0;
+  vector<int> tc_result;
+#endif
 
   Backoff(size_t clocks_per_us) {
     init(clocks_per_us);
   }
-
+#if BACK_OFF_ANALYZE
+  ~Backoff(){
+    for(auto i_backoff=backoff_analyze_result.begin(); i_backoff != backoff_analyze_result.end(); ++i_backoff){
+      cout<<*i_backoff<<endl;
+    }
+    if(backoff_analyze_result.size()>0)
+    cout<<endl<<endl<<endl<<"############################"<<endl<<"############################"<<endl<<endl<<endl;
+    for(auto i_backoff=backoff_analyze_result_tput.begin(); i_backoff != backoff_analyze_result_tput.end(); ++i_backoff){
+      cout<<*i_backoff<<endl;
+    }
+  }
+#endif
+#if COUNT_THREAD
+  ~Backoff(){
+    for(auto i_backoff=tc_result.begin(); i_backoff != tc_result.end(); ++i_backoff){
+      cout<<*i_backoff<<endl;
+      //cout<<"b";
+    }
+    //cout<<"a";
+  }
+#endif
   void init(size_t clocks_per_us) {
     last_time_ = rdtscp();
+    for(int i=0;i<224;i++){
+      thad[i]=0;
+    }
+    for(int i=0;i<5;i++){
+      thad[i]=1;
+    }
+#if BACK_OFF_ANALYZE
+    last_time_analyze = rdtscp();
+    backoff_analyze_result.reserve(600);
+    backoff_analyze_result_tput.reserve(600);
+#endif
+#if COUNT_THREAD
+    tc_result.reserve(60);
+    tslook = false;
+#endif    
     clocks_per_us_ = clocks_per_us;
   }
 
+  void thad_ch_sleep(size_t id){
+    while(thad[id]==0){
+    	_mm_pause();
+	cout<<"  "<<id;
+    }
+    //cout<<"a";
+  }
+
   bool check_update_backoff() {
-    if (chkClkSpan(last_time_, rdtscp(), clocks_per_us_ * 10))
+    if (chkClkSpan(last_time_, rdtscp(), clocks_per_us_ * 5000))
       return true;
     else
       return false;
   }
-
+#if BACK_OFF_ANALYZE
+  bool check_analyze_backoff() {
+    if (chkClkSpan(last_time_analyze, rdtscp(), clocks_per_us_ * 100000))
+      return true;
+    else
+      return false;
+  }
+  void analyze_backoff(){
+    last_time_analyze = rdtscp();
+    double result_backoff = Backoff_.load(std::memory_order_acquire);
+   // cout<<result_backoff<<endl;
+    backoff_analyze_result.push_back(result_backoff);
+    backoff_analyze_result_tput.push_back(last_committed_tput_);
+  }
+#endif
+#if COUNT_THREAD
+  bool check_threadCount() {
+    if (chkClkSpan(last_time_tc, rdtscp(), clocks_per_us_ * 100000))
+      return true;
+    else
+      return false;
+  }
+  void threadCount(){
+    last_time_tc = rdtscp();
+    int result_tc=0;
+    tslook = 1;
+    for(int i=0;i<224;i++){
+      if(threadSleep[i] == true)result_tc++;;
+    }
+    //cout<<result_tc<<endl;
+    tc_result.push_back(result_tc);
+    tslook = 0;
+  }
+#endif
   void update_backoff(const uint64_t committed_txs) {
     uint64_t now = rdtscp();
     uint64_t time_diff = now - last_time_;
@@ -60,6 +150,7 @@ public:
     last_committed_txs_ = committed_txs;
     last_committed_tput_ = committed_tput;
     last_backoff_ = new_backoff;
+    
     /*
     cout << "=====" << endl;
     cout << "committed_tput_diff:\t" <<
@@ -70,10 +161,14 @@ public:
 
     double gradient;
     if (backoff_diff != 0)
-      gradient = committed_tput_diff / backoff_diff;
+      gradient = committed_tput_diff / backoff_diff;//cicada提案式
+      //gradient = committed_tput_diff /committed_tput/backoff_diff;//上昇％の傾き 
     else
       gradient = 0;
-
+      //cout<<gradient*k<<endl;
+      //cout<<committed_tput_diff<<" / "<<committed_tput<<endl;
+    //if (gradient!=0)
+      //new_backoff += k * gradient;
     if (gradient < 0)
       new_backoff -= kIncrBackoff;
     else if (gradient > 0)
@@ -90,25 +185,45 @@ public:
       new_backoff = kMinBackoff;
     else if (new_backoff > kMaxBackoff)
       new_backoff = kMaxBackoff;
+    // new_backoff = 0;
     Backoff_.store(new_backoff, std::memory_order_release);
   }
-
-  static void backoff(size_t clocks_per_us) {
+#if COUNT_THREAD
+  static void backoff(size_t clocks_per_us,size_t id){//,Xoroshiro128Plus &rnd) {
+#endif
+  static void backoff(size_t clocks_per_us){
     uint64_t start(rdtscp()), stop;
     double now_backoff = Backoff_.load(std::memory_order_acquire);
 
     // printf("clocks_per_us * now_backoff:\t%lu\n",
     // static_cast<uint64_t>(static_cast<double>(clocks_per_us) * now_backoff));
+    
+    //ランダムバックオフ用
+    //int backoff_clock = static_cast<int>(static_cast<double>(clocks_per_us) *now_backoff);
+    //if(backoff_clock>0) backoff_clock = rnd.next() % backoff_clock;
+#if COUNT_THREAD
+    if(tslook==0){
+      threadSleep[id]=1;
+    }
+#endif
     for (;;) {
       _mm_pause();
       stop = rdtscp();
+      //ランダムバックオフ用
+      //if (chkClkSpan(start, stop,backoff_clock))
       if (chkClkSpan(start, stop,
-                     static_cast<uint64_t>(static_cast<double>(clocks_per_us) *
+                    static_cast<uint64_t>(static_cast<double>(clocks_per_us) *
                                            now_backoff)))
         break;
     }
+#if COUNT_THREAD
+    if(tslook==0){
+      threadSleep[id]=0;
+    }
+#endif
   }
 };
+
 
 [[maybe_unused]] inline void
 leaderBackoffWork([[maybe_unused]] Backoff &backoff, [[maybe_unused]] std::vector <Result> &res) {
@@ -116,11 +231,25 @@ leaderBackoffWork([[maybe_unused]] Backoff &backoff, [[maybe_unused]] std::vecto
     uint64_t sum_committed_txs(0);
     for (auto &th : res) {
       sum_committed_txs += loadAcquire(th.local_commit_counts_);
-      backoff.update_backoff(sum_committed_txs);
     }
+    backoff.update_backoff(sum_committed_txs);
   }
+#if BACK_OFF_ANALYZE
+  if(backoff.check_analyze_backoff()){
+    backoff.analyze_backoff();
+  }
+#endif
+#if COUNT_THREAD
+  if(backoff.check_threadCount()){
+    backoff.threadCount();
+  }
+#endif
 }
 
 #ifdef GLOBAL_VALUE_DEFINE
 std::atomic<double> Backoff::Backoff_(0);
+#if COUNT_THREAD
+bool Backoff::threadSleep[224] = {}; //64byteにする
+bool Backoff::tslook = false;
+#endif
 #endif

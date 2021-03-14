@@ -55,7 +55,7 @@ public:
    * Release locks.
    * @return void
    */
-  void abort();
+  void abort(size_t id,Xoroshiro128Plus &rnd);
 
   void begin();
 

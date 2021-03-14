@@ -9,7 +9,7 @@ SILO_ALLSRC = $(SILO_SRCS1) $(SRCS2) $(wildcard include/*.hh)
 
 # start of initialization of some parameters.
 ADD_ANALYSIS=1
-BACK_OFF=0
+BACK_OFF=1
 KEY_SIZE=8
 MASSTREE_USE=1
 NO_WAIT_LOCKING_IN_VALIDATION=0
@@ -19,6 +19,9 @@ PROCEDURE_SORT=0
 SLEEP_READ_PHASE=0 # of tics
 VAL_SIZE=4
 WAL=0
+BACK_OFF_READ_PHASE=0
+BACK_OFF_ANALYZE=0
+COUNT_THREAD=0
 # end of initialization
 
 CC = g++
@@ -37,6 +40,9 @@ CFLAGS = -c -pipe -g -O3 -std=c++17 -march=native \
 				 -DPROCEDURE_SORT=$(PROCEDURE_SORT) \
 				 -DSLEEP_READ_PHASE=$(SLEEP_READ_PHASE) \
 				 -DWAL=$(WAL) \
+				 -DBACK_OFF_READ_PHASE=$(BACK_OFF_READ_PHASE) \
+                                 -DBACK_OFF_ANALYZE=$(BACK_OFF_ANALYZE) \
+                                 -DCOUNT_THREAD=$(COUNT_THREAD) \
 
 INCLUDE = -I/usr/include \
 					-I../third_party/ \
