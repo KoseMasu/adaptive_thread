@@ -132,7 +132,11 @@ RETRY:
         Backoff::backoff(FLAGS_clocks_per_us,thid);
       }*/
 #if BACK_OFF
-      backoff.thad_ch_sleep(thid);
+      //cout<<backoff.thad_ch_sleep(thid)<<"  ";
+      while(backoff.thad_ch_sleep(thid) && !loadAcquire(quit)){
+        _mm_pause();
+        //cout<<"  "<<thid;
+      }
 #endif
     } else {
       trans.abort(thid,rnd);
