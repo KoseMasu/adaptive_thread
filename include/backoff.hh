@@ -21,7 +21,8 @@ public:
   //static constexpr double kIncrBackoff = 100;
   static constexpr double kIncrBackoff = 0.5;
   //static constexpr double k = 10;
-  bool thad[224]={};
+  static bool thad[224];
+  static int act_th_num;
 #if COUNT_THREAD
   static bool threadSleep[224]; //64byteにする
   static bool tslook;
@@ -70,9 +71,8 @@ public:
     for(int i=0;i<224;i++){
       thad[i]=0;
     }
-    for(int i=0;i<5;i++){
-      thad[i]=1;
-    }
+    thad[0]=1;
+    act_th_num = 2;
 #if BACK_OFF_ANALYZE
     last_time_analyze = rdtscp();
     backoff_analyze_result.reserve(600);
@@ -85,23 +85,22 @@ public:
     clocks_per_us_ = clocks_per_us;
   }
 
-  void thad_ch_sleep(size_t id){
-    while(thad[id]==0){
-    	_mm_pause();
-	cout<<"  "<<id;
-    }
-    //cout<<"a";
+  bool thad_ch_sleep(size_t id){
+   
+      //cout<<thad[id]<<"  ";
+    return thad[id]==0;
   }
 
   bool check_update_backoff() {
-    if (chkClkSpan(last_time_, rdtscp(), clocks_per_us_ * 5000))
+    if (chkClkSpan(last_time_, rdtscp(), clocks_per_us_ * 50000))
+
       return true;
     else
       return false;
   }
 #if BACK_OFF_ANALYZE
   bool check_analyze_backoff() {
-    if (chkClkSpan(last_time_analyze, rdtscp(), clocks_per_us_ * 100000))
+    if (chkClkSpan(last_time_analyze, rdtscp(), clocks_per_us_ * 500000))
       return true;
     else
       return false;
@@ -110,13 +109,14 @@ public:
     last_time_analyze = rdtscp();
     double result_backoff = Backoff_.load(std::memory_order_acquire);
    // cout<<result_backoff<<endl;
-    backoff_analyze_result.push_back(result_backoff);
+    //backoff_analyze_result.push_back(result_backoff);
+    backoff_analyze_result.push_back(act_th_num);
     backoff_analyze_result_tput.push_back(last_committed_tput_);
   }
 #endif
 #if COUNT_THREAD
   bool check_threadCount() {
-    if (chkClkSpan(last_time_tc, rdtscp(), clocks_per_us_ * 100000))
+    if (chkClkSpan(last_time_tc, rdtscp(), clocks_per_us_ * 50000))
       return true;
     else
       return false;
@@ -158,7 +158,7 @@ public:
     "last_backoff_:\t" << last_backoff_ << endl; cout << "backoff_diff:\t" <<
     backoff_diff << endl;
     */
-
+    
     double gradient;
     if (backoff_diff != 0)
       gradient = committed_tput_diff / backoff_diff;//cicada提案式
@@ -169,16 +169,24 @@ public:
       //cout<<committed_tput_diff<<" / "<<committed_tput<<endl;
     //if (gradient!=0)
       //new_backoff += k * gradient;
-    if (gradient < 0)
+    if (gradient < 0){
       new_backoff -= kIncrBackoff;
-    else if (gradient > 0)
+      if(act_th_num<224)act_th_num+=1;
+    }
+    else if (gradient > 0){
       new_backoff += kIncrBackoff;
+      if(act_th_num>1)act_th_num-=1;
+    }
     else {
       if ((committed_txs & 1) == 0 ||
-          new_backoff == kMaxBackoff)  // 確率はおよそ 1/2, すなわちランダム．
+          new_backoff == kMaxBackoff){  // 確率はおよそ 1/2, すなわちランダム．
         new_backoff -= kIncrBackoff;
-      else if ((committed_txs & 1) == 1 || new_backoff == kMinBackoff)
+	if(act_th_num<224)act_th_num+=1;
+      }
+      else if ((committed_txs & 1) == 1 || new_backoff == kMinBackoff){
         new_backoff += kIncrBackoff;
+        if(act_th_num>1)act_th_num-=1;
+      }
     }
 
     if (new_backoff < kMinBackoff)
@@ -187,6 +195,13 @@ public:
       new_backoff = kMaxBackoff;
     // new_backoff = 0;
     Backoff_.store(new_backoff, std::memory_order_release);
+    for(int i=0;i<act_th_num;i++){
+      thad[i] = 1;
+    }
+    for(int i=0;i<224-act_th_num;i++){
+      thad[i+act_th_num] = 0;
+    }
+    //cout<<act_th_num<<endl;
   }
 #if COUNT_THREAD
   static void backoff(size_t clocks_per_us,size_t id){//,Xoroshiro128Plus &rnd) {
@@ -248,6 +263,8 @@ leaderBackoffWork([[maybe_unused]] Backoff &backoff, [[maybe_unused]] std::vecto
 
 #ifdef GLOBAL_VALUE_DEFINE
 std::atomic<double> Backoff::Backoff_(0);
+bool Backoff::thad[224]={};
+int Backoff::act_th_num=1;
 #if COUNT_THREAD
 bool Backoff::threadSleep[224] = {}; //64byteにする
 bool Backoff::tslook = false;
