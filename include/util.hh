@@ -35,7 +35,7 @@
 
 // class
 class LibcError : public std::exception {
-private:
+ private:
   std::string str_;
 
   static std::string generateMessage(int errnum, const std::string &msg) {
@@ -48,35 +48,38 @@ private:
     if (::strerror_r(errnum, buf, BUF_SIZE) != nullptr)
 #endif  // Linux
 #ifdef Darwin
-    if (::strerror_r(errnum, buf, BUF_SIZE) != 0)
+      if (::strerror_r(errnum, buf, BUF_SIZE) != 0)
 #endif  // Darwin
-    s += buf;
+        s += buf;
     return s;
   }
 
-public:
+ public:
   explicit LibcError(int errnum = errno, const std::string &msg = "libc_error:")
-          : str_(generateMessage(errnum, msg)) {}
+      : str_(generateMessage(errnum, msg)) {}
 };
 
 // function
-extern bool chkSpan(struct timeval &start, struct timeval &stop, long threshold);
+extern bool chkSpan(struct timeval &start, struct timeval &stop,
+                    long threshold);
 
 extern size_t decideParallelBuildNumber(size_t tuple_num);
 
-extern void displayProcedureVector(std::vector <Procedure> &pro);
+extern void displayProcedureVector(std::vector<Procedure> &pro);
 
 extern void displayRusageRUMaxrss();
 
 extern bool isReady(const std::vector<char> &readys);
 
-extern void readyAndWaitForReadyOfAllThread(std::atomic <size_t> &running, const size_t thnm);
+extern void readyAndWaitForReadyOfAllThread(std::atomic<size_t> &running,
+                                            const size_t thnm);
 
 extern void sleepMs(size_t ms);
 
 extern void waitForReady(const std::vector<char> &readys);
 
-extern void waitForReadyOfAllThread(std::atomic <size_t> &running, const size_t thnm);
+extern void waitForReadyOfAllThread(std::atomic<size_t> &running,
+                                    const size_t thnm);
 
 //----------
 // After this line, intending to force inline function.
@@ -93,8 +96,8 @@ extern void waitForReadyOfAllThread(std::atomic <size_t> &running, const size_t 
 }
 
 [[maybe_unused]] inline static bool chkClkSpanSec(
-        const uint64_t start, const uint64_t stop, const unsigned int clocks_per_us,
-        const uint64_t sec) {
+    const uint64_t start, const uint64_t stop, const unsigned int clocks_per_us,
+    const uint64_t sec) {
   uint64_t diff = 0;
   diff = stop - start;
   diff = diff / clocks_per_us / 1000 / 1000;
@@ -104,10 +107,12 @@ extern void waitForReadyOfAllThread(std::atomic <size_t> &running, const size_t 
     return false;
 }
 
-inline static void makeProcedure(std::vector <Procedure> &pro, Xoroshiro128Plus &rnd,
-                                 FastZipf &zipf, size_t tuple_num, size_t max_ope,
-                                 size_t thread_num, size_t rratio, bool rmw, bool ycsb,
-                                 bool partition, size_t thread_id, [[maybe_unused]]Result &res) {
+inline static void makeProcedure(std::vector<Procedure> &pro,
+                                 Xoroshiro128Plus &rnd, FastZipf &zipf,
+                                 size_t tuple_num, size_t max_ope,
+                                 size_t thread_num, size_t rratio, bool rmw,
+                                 bool ycsb, bool partition, size_t thread_id,
+                                 [[maybe_unused]] Result &res) {
 #if ADD_ANALYSIS
   uint64_t start = rdtscp();
 #endif
@@ -151,7 +156,7 @@ inline static void makeProcedure(std::vector <Procedure> &pro, Xoroshiro128Plus 
 
 #if KEY_SORT
   std::sort(pro.begin(), pro.end());
-#endif // KEY_SORT
+#endif  // KEY_SORT
 
 #if ADD_ANALYSIS
   res.local_make_procedure_latency_ += rdtscp() - start;
@@ -162,5 +167,3 @@ inline static void makeProcedure(std::vector <Procedure> &pro, Xoroshiro128Plus 
   uint64_t start(rdtscp());
   while (rdtscp() - start < tics) _mm_pause();
 }
-
-

@@ -19,7 +19,7 @@
 #endif  // Linux
 
 class File {
-private:
+ private:
   int fd_;
   bool autoClose_;
 
@@ -30,7 +30,7 @@ private:
     throw LibcError(err, s);
   }
 
-public:
+ public:
   File() : fd_(-1), autoClose_(false) {}
 
   bool open(const std::string &filePath, int flags) {
@@ -54,7 +54,7 @@ public:
   }
 
   explicit File(int fd, bool autoClose = false)
-          : fd_(fd), autoClose_(autoClose) {}
+      : fd_(fd), autoClose_(autoClose) {}
 
   ~File() noexcept try { close(); } catch (...) {
   }
@@ -136,7 +136,7 @@ inline void createEmptyFile(const std::string &path, mode_t mode = 0644) {
  * String : it must have size(), resize(), and operator[].
  * such as std::string and std::vector<char>.
  */
-template<typename String>
+template <typename String>
 inline void readAllFromFile(File &file, String &buf) {
   constexpr const size_t usize = 4096;  // unit size.
   size_t rsize = buf.size();            // read data will be appended to buf.
@@ -150,7 +150,7 @@ inline void readAllFromFile(File &file, String &buf) {
   buf.resize(rsize);
 }
 
-template<typename String>
+template <typename String>
 inline void readAllFromFile(const std::string &path, String &buf) {
   File file(path, O_RDONLY);
   readAllFromFile(file, buf);

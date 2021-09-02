@@ -7,7 +7,7 @@
 #include "./cache_line_size.hh"
 
 class Result {
-public:
+ public:
   alignas(CACHE_LINE_SIZE) uint64_t local_abort_counts_ = 0;
   uint64_t local_commit_counts_ = 0;
 #if ADD_ANALYSIS
@@ -90,7 +90,7 @@ public:
   void displayAbortByOperationRate();   // abort by operation rate;
   void displayAbortByValidationRate();  // abort by validation rate;
   void displayCommitLatencyRate(size_t clocks_per_us, size_t extime,
-                                 size_t thread_num);
+                                size_t thread_num);
   void displayBackoffLatencyRate(size_t clocks_per_us, size_t extime,
                                  size_t thread_num);
   void displayEarlyAbortRate();
@@ -101,10 +101,10 @@ public:
   void displayGCTMTElementsCounts();
   void displayGCVersionCounts();
   void displayMakeProcedureLatencyRate(size_t clocks_per_us, size_t extime,
-      size_t thread_num);
+                                       size_t thread_num);
   void displayMemcpys();
   void displayOtherWorkLatencyRate(size_t clocks_per_us, size_t extime,
-      size_t thread_num);
+                                   size_t thread_num);
   void displayPreemptiveAbortsCounts();
   void displayRatioOfPreemptiveAbortToTotalAbort();
   void displayReadLatencyRate(size_t clocks_per_us, size_t extime,

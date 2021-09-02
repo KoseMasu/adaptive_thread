@@ -42,6 +42,7 @@ void worker(size_t thid, char &ready, const bool &start, const bool &quit,const 
   TxnExecutor trans(thid, (Result *) &myres);
   FastZipf zipf(&rnd, FLAGS_zipf_skew, FLAGS_tuple_num);
   uint64_t epoch_timer_start, epoch_timer_stop;
+  int skewCount = 0;
 #if BACK_OFF||BACK_OFF_READ_PHASE
   Backoff backoff(FLAGS_clocks_per_us);
 #endif
@@ -78,7 +79,16 @@ void worker(size_t thid, char &ready, const bool &start, const bool &quit,const 
   storeRelease(ready, 1);
   while (!loadAcquire(start)) _mm_pause();
   if (thid == 0) epoch_timer_start = rdtscp();
-  while (!loadAcquire(quit)) {
+  uint64_t last_time = rdtscp();
+  while (!loadAcquire(quit)){
+    uint64_t now = rdtscp();
+    double time_diff = (static_cast<double>(now - last_time)/ 2095)/1000000;
+    if(time_diff>20){
+	zipf.changeZipf(skewCount);
+	skewCount++;
+//	cout<<thid<<endl;
+    	last_time = now;
+    }
 #if PARTITION_TABLE
     makeProcedure(trans.pro_set_, rnd, zipf, FLAGS_tuple_num, FLAGS_max_ope,
                   FLAGS_thread_num, FLAGS_rratio, FLAGS_rmw, FLAGS_ycsb, true,

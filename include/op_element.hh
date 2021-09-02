@@ -2,9 +2,9 @@
 
 #include "debug.hh"
 
-template<typename T>
+template <typename T>
 class OpElement {
-public:
+ public:
   uint64_t key_;
   T *rcdptr_;
 

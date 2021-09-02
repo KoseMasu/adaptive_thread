@@ -12,7 +12,7 @@ enum class Ope : uint8_t {
 };
 
 class Procedure {
-public:
+ public:
   Ope ope_;
   uint64_t key_;
   bool ronly_ = false;
