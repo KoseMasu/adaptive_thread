@@ -84,7 +84,7 @@ void worker(size_t thid, char &ready, const bool &start, const bool &quit,const 
     uint64_t now = rdtscp();
     double time_diff = (static_cast<double>(now - last_time)/ 2095)/1000000;
     if(time_diff>20){
-	zipf.changeZipf(skewCount);
+	//zipf.changeZipf(skewCount);
 	skewCount++;
 //	cout<<thid<<endl;
     	last_time = now;
@@ -138,15 +138,19 @@ RETRY:
        */
       storeRelease(myres.local_commit_counts_,
                    loadAcquire(myres.local_commit_counts_) + 1);
-      /*if(rnd.next()%10 < 2){
-        Backoff::backoff(FLAGS_clocks_per_us,thid);
-      }*/
+      //if(rnd.next()%100 < 10){
+        //Backoff::backoff(FLAGS_clocks_per_us,thid);
+      //}
 #if BACK_OFF
-      //cout<<backoff.thad_ch_sleep(thid)<<"  ";
-      while(backoff.thad_ch_sleep(thid) && !loadAcquire(quit)){
-        _mm_pause();
-        //cout<<"  "<<thid;
-      }
+      #if ADAPTIVE_THREAD
+      	//cout<<backoff.thad_ch_sleep(thid)<<"  ";
+      	while(backoff.thad_ch_sleep(thid) && !loadAcquire(quit)){
+        	_mm_pause();
+        	//cout<<"  "<<thid;
+      	}
+      #else
+        Backoff::backoff(FLAGS_clocks_per_us,thid);
+      #endif
 #endif
     } else {
       trans.abort(thid,rnd);

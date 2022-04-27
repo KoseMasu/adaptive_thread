@@ -249,8 +249,8 @@ void TxnExecutor::abort(size_t id,Xoroshiro128Plus &rnd) {
 #if ADD_ANALYSIS
   //uint64_t start(rdtscp());
 #endif
-  //if(rnd.next()%10 < 2){
-  //	Backoff::backoff(FLAGS_clocks_per_us,id);//,rnd);
+  //if(rnd.next()%100 < 10){
+  	//Backoff::backoff(FLAGS_clocks_per_us,id);//,rnd);
   //}
 
 #if ADD_ANALYSIS

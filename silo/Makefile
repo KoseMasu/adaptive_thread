@@ -20,8 +20,9 @@ SLEEP_READ_PHASE=0 # of tics
 VAL_SIZE=4
 WAL=0
 BACK_OFF_READ_PHASE=0
-BACK_OFF_ANALYZE=1
-COUNT_THREAD=0
+BACK_OFF_ANALYZE=0
+COUNT_THREAD=1
+ADAPTIVE_THREAD=1
 # end of initialization
 
 CC = g++
@@ -43,6 +44,7 @@ CFLAGS = -c -pipe -g -O3 -std=c++17 -march=native \
 				 -DBACK_OFF_READ_PHASE=$(BACK_OFF_READ_PHASE) \
                                  -DBACK_OFF_ANALYZE=$(BACK_OFF_ANALYZE) \
                                  -DCOUNT_THREAD=$(COUNT_THREAD) \
+				 -DADAPTIVE_THREAD=$(ADAPTIVE_THREAD) \
 
 INCLUDE = -I/usr/include \
 					-I../third_party/ \
